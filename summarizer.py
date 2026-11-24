@@ -50,3 +50,48 @@ def read_input(path, stdin=sys.stdin):
         return stdin.read()
     with open(path, encoding="utf-8") as f:
         return f.read()
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Summarize a text file with Claude.")
+    parser.add_argument("file", nargs="?", help="text file to summarize (default: stdin)")
+    parser.add_argument("-s", "--style", choices=sorted(STYLES), default="bullets")
+    parser.add_argument("-w", "--max-words", type=int, help="maximum length of the summary")
+    args = parser.parse_args(argv)
+
+    try:
+        text = read_input(args.file)
+        build_prompt(text, args.style, args.max_words)  # validate before calling the API
+    except (OSError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    try:
+        import anthropic
+    except ImportError:
+        print("The anthropic package is missing. Run: pip install -r requirements.txt",
+              file=sys.stderr)
+        return 1
+
+    try:
+        print(summarize(anthropic.Anthropic(), text, args.style, args.max_words))
+    except SummaryRefused as e:
+        print(e, file=sys.stderr)
+        return 2
+    except anthropic.AuthenticationError:
+        print("Authentication failed. Set a valid ANTHROPIC_API_KEY.", file=sys.stderr)
+        return 1
+    except anthropic.RateLimitError:
+        print("Rate limited by the API. Wait a moment and try again.", file=sys.stderr)
+        return 1
+    except anthropic.APIStatusError as e:
+        print(f"API error ({e.status_code}): {e.message}", file=sys.stderr)
+        return 1
+    except anthropic.APIConnectionError:
+        print("Could not reach the API. Check your internet connection.", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
