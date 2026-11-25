@@ -45,6 +45,11 @@ def summarize(client, text, style="bullets", max_words=None):
     return "".join(block.text for block in response.content if block.type == "text").strip()
 
 
+def has_credentials(client):
+    """True if the client found an API key, auth token or credentials profile."""
+    return any(getattr(client, name, None) for name in ("api_key", "auth_token", "credentials"))
+
+
 def read_input(path, stdin=sys.stdin):
     if path in (None, "-"):
         return stdin.read()
@@ -73,8 +78,13 @@ def main(argv=None):
               file=sys.stderr)
         return 1
 
+    client = anthropic.Anthropic()
+    if not has_credentials(client):
+        print("No API key found. Set ANTHROPIC_API_KEY and try again.", file=sys.stderr)
+        return 1
+
     try:
-        print(summarize(anthropic.Anthropic(), text, args.style, args.max_words))
+        print(summarize(client, text, args.style, args.max_words))
     except SummaryRefused as e:
         print(e, file=sys.stderr)
         return 2

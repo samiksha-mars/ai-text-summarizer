@@ -1,11 +1,18 @@
 """Tests use a fake client, so they run without an API key or the anthropic package."""
 
 import io
+import sys
 import tempfile
 import types
 import unittest
+from contextlib import redirect_stderr
+from pathlib import Path
+from unittest import mock
 
-from summarizer import MODEL, SummaryRefused, build_prompt, read_input, summarize
+from summarizer import (MODEL, SummaryRefused, build_prompt, has_credentials, main,
+                        read_input, summarize)
+
+SAMPLE = str(Path(__file__).with_name("sample_article.txt"))
 
 
 class FakeClient:
@@ -71,6 +78,24 @@ class ReadInputTest(unittest.TestCase):
         with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
             f.write("from file")
         self.assertEqual(read_input(f.name), "from file")
+
+
+class CredentialsTest(unittest.TestCase):
+
+    def test_has_credentials(self):
+        self.assertTrue(has_credentials(types.SimpleNamespace(api_key="sk-test")))
+        self.assertTrue(has_credentials(types.SimpleNamespace(api_key=None, credentials=object())))
+        self.assertFalse(has_credentials(types.SimpleNamespace(api_key=None, auth_token=None)))
+
+    def test_missing_credentials_exit_without_calling_api(self):
+        client = FakeClient()
+        client.api_key = client.auth_token = client.credentials = None
+        fake_anthropic = types.SimpleNamespace(Anthropic=lambda: client)
+        stderr = io.StringIO()
+        with mock.patch.dict(sys.modules, anthropic=fake_anthropic), redirect_stderr(stderr):
+            self.assertEqual(main([SAMPLE]), 1)
+        self.assertIn("ANTHROPIC_API_KEY", stderr.getvalue())
+        self.assertEqual(client.calls, [])
 
 
 if __name__ == "__main__":
