@@ -48,6 +48,17 @@ class BuildPromptTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_prompt("   \n", "bullets")
 
+    def test_non_positive_word_limit(self):
+        for limit in (0, -5):
+            with self.assertRaises(ValueError):
+                build_prompt("text", "paragraph", limit)
+
+    def test_cli_rejects_bad_word_limit_before_calling_api(self):
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            self.assertEqual(main([SAMPLE, "--max-words", "0"]), 1)
+        self.assertIn("--max-words", stderr.getvalue())
+
 
 class SummarizeTest(unittest.TestCase):
 

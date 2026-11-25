@@ -25,6 +25,8 @@ def build_prompt(text, style="bullets", max_words=None):
         raise ValueError(f"unknown style {style!r}, choose from {', '.join(STYLES)}")
     if not text.strip():
         raise ValueError("there is no text to summarize")
+    if max_words is not None and max_words < 1:
+        raise ValueError("--max-words must be a positive number")
     instruction = STYLES[style]
     if max_words:
         instruction += f" Use at most {max_words} words."
